@@ -12,6 +12,7 @@ end
 class DummyRailsApp < Rails::Application
   config.secret_key_base = 'dummy'
   config.eager_load = false
+  config.hosts.clear
   routes.append do
     get '/test' => 'dummy#index'
   end
@@ -31,7 +32,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
 
     get '/test'
   rescue StandardError
-  # skip execption
+    # skip execption
   ensure
     assert called, 'Breakfalls handler should be called when DummyController raises'
   end
