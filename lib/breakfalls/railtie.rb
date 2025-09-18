@@ -15,7 +15,7 @@ module Breakfalls
           klass = controller.to_s.safe_constantize
           klass.class_eval do
             unless method_defined?(:breakfalls_dispatch)
-              def breakfalls_dispatch
+              def dispatch_breakfalls
                 yield
               rescue StandardError => e
                 Breakfalls.run_error_handlers(
@@ -29,7 +29,7 @@ module Breakfalls
             end
           end
 
-          klass.send(:around_action, :breakfalls_dispatch)
+          klass.send(:around_action, :dispatch_breakfalls)
         end
       end
     end
