@@ -35,6 +35,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency 'actionpack', '>= 6.0'
   spec.add_dependency 'railties', '>= 6.0'
+  spec.add_development_dependency 'rails', '>= 6.0'
 
   # Uncomment to register a new dependency of your gem
   # spec.add_dependency "example-gem", "~> 1.0"
