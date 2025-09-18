@@ -3,22 +3,25 @@
 require 'test_helper'
 require 'breakfalls/railtie'
 
-class DummyRailsApp < Rails::Application
-  config.secret_key_base = 'dummy'
-  config.eager_load = false
-  routes.draw { get 'test' => 'dummy#index' }
-end
-
 class DummyController < ActionController::Base
   def index
     raise 'error!'
   end
 end
 
+class DummyRailsApp < Rails::Application
+  config.secret_key_base = 'dummy'
+  config.eager_load = false
+  config.hosts.clear
+  routes.append do
+    get '/test' => 'dummy#index'
+  end
+end
+
 class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
   def setup
-    Rails.application = DummyRailsApp
-    Rails.application.config.breakfalls.controller = %w[DummyController]
+    Rails.application = DummyRailsApp.instance
+    Rails.application.config.breakfalls.controllers = %w[DummyController]
     Rails.application.initialize!
     Rails.application.reloader.prepare!
   end
@@ -27,9 +30,9 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     called = false
     Breakfalls.on_error { |_e, _req, _user, _params| called = true }
 
-    get 'test'
+    get '/test'
   rescue StandardError
-  # skip execption
+    # skip execption
   ensure
     assert called, 'Breakfalls handler should be called when DummyController raises'
   end

@@ -12,26 +12,24 @@ module Breakfalls
 
       controllers.each do |controller|
         ActiveSupport.on_load(:action_controller) do
-          klass = controller.safe_constantize
-          next unless klass
-
+          klass = controller.to_s.safe_constantize
           klass.class_eval do
-            around_action :breakfalls_dispatch
-
-            private
-
-            def breakfalls_dispatch
-              yield
-            rescue StandardError => e
-              Breakfalls.run_error_handlers(
-                e,
-                request,
-                (respond_to?(current_user) ? current_user : nil),
-                params
-              )
-              raise e
+            unless method_defined?(:breakfalls_dispatch)
+              def breakfalls_dispatch
+                yield
+              rescue StandardError => e
+                Breakfalls.run_error_handlers(
+                  e,
+                  request: request,
+                  user: (respond_to?(:current_user) ? current_user : nil),
+                  params: params
+                )
+                raise e
+              end
             end
           end
+
+          klass.send(:around_action, :breakfalls_dispatch)
         end
       end
     end
