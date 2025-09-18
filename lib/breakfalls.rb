@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'breakfalls/version'
+require 'breakfalls/railtie' if defined?(Rails)
 
 module Breakfalls
   class << self
