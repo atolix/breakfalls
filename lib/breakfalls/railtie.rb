@@ -14,7 +14,7 @@ module Breakfalls
         ActiveSupport.on_load(:action_controller) do
           klass = controller.to_s.safe_constantize
           klass.class_eval do
-            unless method_defined?(:breakfalls_dispatch)
+            unless method_defined?(:dispatch_breakfalls)
               def dispatch_breakfalls
                 yield
               rescue StandardError => e
