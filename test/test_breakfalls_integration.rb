@@ -11,6 +11,7 @@ end
 
 class DummyRailsApp < Rails::Application
   config.secret_key_base = 'dummy'
+  config.active_support.to_time_preserves_timezone = :zone
   config.eager_load = false
   config.hosts.clear
   routes.append do
