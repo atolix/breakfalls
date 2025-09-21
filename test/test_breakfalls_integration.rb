@@ -4,8 +4,42 @@ require 'test_helper'
 require 'breakfalls/railtie'
 
 class DummyController < ActionController::Base
-  def index
-    raise 'error!'
+  def current_user
+    { 'id' => 123, 'name' => 'dummy' }
+  end
+
+  def unrescued_standard
+    raise StandardError, 'error!'
+  end
+
+  class RequestError < StandardError; end
+
+  def rescued_custom
+    raise RequestError
+  rescue RequestError
+    head :ok
+  end
+
+  def rescued_standard
+    raise StandardError, 'boom'
+  rescue StandardError
+    head :ok
+  end
+
+  def success
+    head :ok
+  end
+end
+
+class AnotherController < ActionController::Base
+  def unrescued_standard
+    raise StandardError, 'another error!'
+  end
+end
+
+class UnregisteredController < ActionController::Base
+  def unrescued_standard
+    raise StandardError, 'unregistered error!'
   end
 end
 
@@ -15,26 +49,137 @@ class DummyRailsApp < Rails::Application
   config.eager_load = false
   config.hosts.clear
   routes.append do
-    get '/test' => 'dummy#index'
+    get '/unrescued_standard' => 'dummy#unrescued_standard'
+    get '/rescued_custom' => 'dummy#rescued_custom'
+    get '/rescued_standard' => 'dummy#rescued_standard'
+    get '/success' => 'dummy#success'
+    get '/another_unrescued_standard' => 'another#unrescued_standard'
+    get '/unregistered_unrescued_standard' => 'unregistered#unrescued_standard'
   end
 end
 
 class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
   def setup
     Rails.application = DummyRailsApp.instance
-    Rails.application.config.breakfalls.controllers = %w[DummyController]
-    Rails.application.initialize!
+    Rails.application.config.breakfalls.controllers = %w[DummyController AnotherController]
+    Rails.application.initialize! unless Rails.application.initialized?
     Rails.application.reloader.prepare!
+    Breakfalls.error_handlers.clear
   end
 
-  def test_handler_called_on_exception
+  def test_handler_called_on_unrescued_standard_error
     called = false
-    Breakfalls.on_error { |_e, _req, _user, _params| called = true }
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
 
-    get '/test'
+    get '/unrescued_standard'
   rescue StandardError
     # skip execption
   ensure
     assert called, 'Breakfalls handler should be called when DummyController raises'
+  end
+
+  def test_handler_receives_exception
+    captured_exception = nil
+
+    Breakfalls.on_error do |exception, _request, _user, _params|
+      captured_exception = exception
+    end
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_kind_of StandardError, captured_exception, 'exception should be passed to the handler'
+    assert_equal 'error!', captured_exception.message, 'exception message should be preserved'
+  end
+
+  def test_handler_receives_request
+    captured_path = nil
+
+    Breakfalls.on_error do |_exception, request, _user, _params|
+      captured_path = request&.path
+    end
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal '/unrescued_standard', captured_path, 'request should be passed to the handler'
+  end
+
+  def test_handler_receives_current_user
+    captured_user = nil
+    Breakfalls.on_error { |_e, _request, user, _params| captured_user = user }
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal({ 'id' => 123, 'name' => 'dummy' }, captured_user,
+                 'current_user should be passed to the handler when available')
+  end
+
+  def test_handler_receives_params
+    captured_params = nil
+
+    Breakfalls.on_error do |_exception, _request, _user, params|
+      captured_params = params
+    end
+
+    get '/unrescued_standard', params: { foo: 'bar' }
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal 'bar', captured_params['foo'], 'params should be passed to the handler'
+  end
+
+  def test_handler_not_called_on_success
+    called = false
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
+
+    get '/success'
+
+    assert !called, 'Breakfalls handler should not be called on successful responses'
+  end
+
+  def test_handler_skips_when_custom_exception_is_rescued
+    called = false
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
+
+    get '/rescued_custom'
+  ensure
+    assert !called, 'Breakfalls handler should not be called when the controller rescues the exception'
+  end
+
+  def test_handler_skips_when_standard_error_is_rescued
+    called = false
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
+
+    get '/rescued_standard'
+  ensure
+    assert !called, 'Breakfalls handler should not be called when StandardError is rescued in the controller'
+  end
+
+  def test_handler_called_on_unrescued_standard_error_in_another_controller
+    called = false
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
+
+    get '/another_unrescued_standard'
+  rescue StandardError
+    # skip exception
+  ensure
+    assert called, 'Breakfalls handler should be called for another registered controller when it raises'
+  end
+
+  def test_handler_not_called_for_unregistered_controller
+    called = false
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
+
+    get '/unregistered_unrescued_standard'
+  rescue StandardError
+    # skip exception
+  ensure
+    assert !called,
+           'Breakfalls handler should not be called for controllers not registered in config.breakfalls.controllers'
   end
 end
