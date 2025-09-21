@@ -48,4 +48,17 @@ class TestBreakfallsControllerHandlers < Minitest::Test
     assert called_global, 'global handler should be called when no controller-specific handlers exist'
     assert_equal 1, result.size
   end
+
+  def test_multiple_controller_specific_handlers_are_all_called
+    called1 = false
+    called2 = false
+
+    Breakfalls.on_error_for('FooController') { |_e, _req, _user, _params| called1 = true }
+    Breakfalls.on_error_for('FooController') { |_e, _req, _user, _params| called2 = true }
+
+    result = Breakfalls.run_error_handlers(StandardError.new('oops'), controller: 'FooController')
+
+    assert called1 && called2, 'all controller-specific handlers should be called'
+    assert_equal 2, result.size, 'should execute both controller-specific handlers when no global handlers are present'
+  end
 end

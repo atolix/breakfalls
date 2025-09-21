@@ -220,6 +220,19 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     assert called_global, 'global handler should also be called'
   end
 
+  def test_multiple_controller_specific_handlers_are_all_called_for_dummy
+    called1 = false
+    called2 = false
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| called1 = true }
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| called2 = true }
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert called1 && called2, 'all controller-specific handlers should be called for DummyController'
+  end
+
   def test_global_only_called_when_no_controller_specific
     called_global = false
     Breakfalls.on_error { |_e, _req, _user, _params| called_global = true }
