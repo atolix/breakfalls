@@ -1,38 +1,65 @@
 # Breakfalls
 
-TODO: Delete this and the text below, and describe your gem
-
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/breakfalls`. To experiment with that code, run `bin/console` for an interactive prompt.
+Breakfalls is a tiny Rails helper that lets you register error-handling hooks for your controllers. It installs an around_action wrapper for selected controllers, catches any StandardError, invokes your registered handlers (global and per-controller), and then re-raises the error so your existing error reporting still works.
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
-
-Install the gem and add to the application's Gemfile by executing:
+Add to your application's Gemfile and bundle:
 
 ```bash
-bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+bundle add breakfalls
 ```
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+Or install directly:
 
 ```bash
-gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+gem install breakfalls
 ```
 
 ## Usage
 
-TODO: Write usage instructions here
+1) Tell Breakfalls which controllers to wrap. In an initializer (e.g. `config/initializers/breakfalls.rb`):
+
+```ruby
+# Wrap these controllers with Breakfalls' around_action
+Rails.application.config.breakfalls.controllers = [
+  'UsersController',
+  'Admin::BaseController'
+]
+```
+
+2) Register one or more handlers. Handlers receive `(exception, request, user, params)` in that order.
+
+```ruby
+# Global handler (runs for any wrapped controller)
+Breakfalls.on_error do |exception, request, user, params|
+  Rails.logger.error("[Global] #{exception.class}: #{exception.message} path=#{request&.path}")
+end
+
+# Controller-specific handler (runs before global handlers)
+Breakfalls.on_error_for('UsersController') do |exception, request, user, params|
+  Rails.logger.warn("[UsersController] #{exception.class} at #{request&.path}")
+end
+```
+
+Order of execution: controller-specific handlers (in registration order) then global handlers (in registration order). After handlers run, the exception is re-raised so your existing error handling/reporting still applies.
+
+## Handler order
+
+- Controller-specific first: If the current controller matches, its handlers run before any global handlers.
+- Registration order: Within each group, handlers run in the order they were registered (FIFO).
+- Match scope: Only handlers registered for the exact controller class name run for that controller.
+- Handler failure: If a handler itself raises, remaining handlers are skipped and that exception bubbles up.
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake test` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo, run `bundle install` to install dependencies. Then run `rake test` to execute the test suite.
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `lib/breakfalls/version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push the tag/commits, and push the `.gem` file to rubygems.org.
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/breakfalls. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/[USERNAME]/breakfalls/blob/master/CODE_OF_CONDUCT.md).
+Bug reports and pull requests are welcome on GitHub at https://github.com/atolix/breakfalls. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the code of conduct.
 
 ## License
 
@@ -40,4 +67,4 @@ The gem is available as open source under the terms of the [MIT License](https:/
 
 ## Code of Conduct
 
-Everyone interacting in the Breakfalls project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/[USERNAME]/breakfalls/blob/master/CODE_OF_CONDUCT.md).
+Everyone interacting in the Breakfalls project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/atolix/breakfalls/blob/main/CODE_OF_CONDUCT.md).
