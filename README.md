@@ -16,6 +16,16 @@ Or install directly:
 gem install breakfalls
 ```
 
+Pre-release builds (alpha/beta/rc):
+
+```bash
+# RubyGems
+gem install breakfalls --pre
+
+# Bundler (explicit version pin)
+bundle add breakfalls --version "0.0.2.alpha"
+```
+
 ## Usage
 
 1) Tell Breakfalls which controllers to wrap. In an initializer (e.g. `config/initializers/breakfalls.rb`):
