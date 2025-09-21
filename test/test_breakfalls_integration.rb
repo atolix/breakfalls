@@ -15,7 +15,7 @@ class DummyRailsApp < Rails::Application
   config.eager_load = false
   config.hosts.clear
   routes.append do
-    get '/test' => 'dummy#index'
+    get '/index' => 'dummy#index'
   end
 end
 
@@ -31,7 +31,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     called = false
     Breakfalls.on_error { |_e, _req, _user, _params| called = true }
 
-    get '/test'
+    get '/index'
   rescue StandardError
     # skip execption
   ensure
