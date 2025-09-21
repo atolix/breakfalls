@@ -59,7 +59,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
 
   def test_handler_called_on_unrescued_standard_error
     called = false
-    Breakfalls.on_error { |_e, _req, _user, _params| called = true }
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
 
     get '/unrescued_standard'
   rescue StandardError
@@ -70,7 +70,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
 
   def test_handler_skips_when_custom_exception_is_rescued
     called = false
-    Breakfalls.on_error { |_e, _req, _user, _params| called = true }
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
 
     get '/rescued_custom'
   ensure
@@ -79,7 +79,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
 
   def test_handler_skips_when_standard_error_is_rescued
     called = false
-    Breakfalls.on_error { |_e, _req, _user, _params| called = true }
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
 
     get '/rescued_standard'
   ensure
@@ -88,7 +88,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
 
   def test_handler_called_on_unrescued_standard_error_in_another_controller
     called = false
-    Breakfalls.on_error { |_e, _req, _user, _params| called = true }
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
 
     get '/another_unrescued_standard'
   rescue StandardError
@@ -99,7 +99,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
 
   def test_handler_not_called_for_unregistered_controller
     called = false
-    Breakfalls.on_error { |_e, _req, _user, _params| called = true }
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
 
     get '/unregistered_unrescued_standard'
   rescue StandardError
@@ -107,5 +107,33 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
   ensure
     assert !called,
            'Breakfalls handler should not be called for controllers not registered in config.breakfalls.controllers'
+  end
+
+  def test_handler_receives_request
+    captured_path = nil
+
+    Breakfalls.on_error do |_exception, request, _user, _params|
+      captured_path = request&.path
+    end
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal '/unrescued_standard', captured_path, 'request should be passed to the handler'
+  end
+
+  def test_handler_receives_params
+    captured_params = nil
+
+    Breakfalls.on_error do |_exception, _request, _user, params|
+      captured_params = params
+    end
+
+    get '/unrescued_standard', params: { foo: 'bar' }
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal 'bar', captured_params['foo'], 'params should be passed to the handler'
   end
 end
