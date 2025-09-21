@@ -68,6 +68,49 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     assert called, 'Breakfalls handler should be called when DummyController raises'
   end
 
+  def test_handler_receives_exception
+    captured_exception = nil
+
+    Breakfalls.on_error do |exception, _request, _user, _params|
+      captured_exception = exception
+    end
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_kind_of StandardError, captured_exception, 'exception should be passed to the handler'
+    assert_equal 'error!', captured_exception.message, 'exception message should be preserved'
+  end
+
+  def test_handler_receives_request
+    captured_path = nil
+
+    Breakfalls.on_error do |_exception, request, _user, _params|
+      captured_path = request&.path
+    end
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal '/unrescued_standard', captured_path, 'request should be passed to the handler'
+  end
+
+  def test_handler_receives_params
+    captured_params = nil
+
+    Breakfalls.on_error do |_exception, _request, _user, params|
+      captured_params = params
+    end
+
+    get '/unrescued_standard', params: { foo: 'bar' }
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal 'bar', captured_params['foo'], 'params should be passed to the handler'
+  end
+
   def test_handler_skips_when_custom_exception_is_rescued
     called = false
     Breakfalls.on_error { |_e, _request, _user, _params| called = true }
@@ -107,33 +150,5 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
   ensure
     assert !called,
            'Breakfalls handler should not be called for controllers not registered in config.breakfalls.controllers'
-  end
-
-  def test_handler_receives_request
-    captured_path = nil
-
-    Breakfalls.on_error do |_exception, request, _user, _params|
-      captured_path = request&.path
-    end
-
-    get '/unrescued_standard'
-  rescue StandardError
-    # skip exception from unrescued action
-  ensure
-    assert_equal '/unrescued_standard', captured_path, 'request should be passed to the handler'
-  end
-
-  def test_handler_receives_params
-    captured_params = nil
-
-    Breakfalls.on_error do |_exception, _request, _user, params|
-      captured_params = params
-    end
-
-    get '/unrescued_standard', params: { foo: 'bar' }
-  rescue StandardError
-    # skip exception from unrescued action
-  ensure
-    assert_equal 'bar', captured_params['foo'], 'params should be passed to the handler'
   end
 end
