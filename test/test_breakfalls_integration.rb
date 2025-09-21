@@ -13,14 +13,12 @@ class DummyController < ActionController::Base
   def rescued_custom
     raise RequestError
   rescue RequestError
-    puts 'failed'
     head :ok
   end
 
   def rescued_standard
     raise StandardError, 'boom'
   rescue StandardError
-    puts 'rescued standard'
     head :ok
   end
 end
