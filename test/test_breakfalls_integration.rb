@@ -5,7 +5,7 @@ require 'breakfalls/railtie'
 
 class DummyController < ActionController::Base
   def unrescued_standard
-    raise 'error!'
+    raise StandardError, 'error!'
   end
 
   class RequestError < StandardError; end
