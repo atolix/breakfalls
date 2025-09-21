@@ -61,4 +61,29 @@ class TestBreakfallsControllerHandlers < Minitest::Test
     assert called1 && called2, 'all controller-specific handlers should be called'
     assert_equal 2, result.size, 'should execute both controller-specific handlers when no global handlers are present'
   end
+
+  def test_controller_specific_handlers_called_in_registration_order
+    sequence = []
+
+    Breakfalls.on_error_for('FooController') { |_e, _req, _user, _params| sequence << 'c1' }
+    Breakfalls.on_error_for('FooController') { |_e, _req, _user, _params| sequence << 'c2' }
+
+    Breakfalls.run_error_handlers(StandardError.new('oops'), controller: 'FooController')
+
+    assert_equal %w[c1 c2], sequence, 'controller-specific handlers should be invoked in registration order'
+  end
+
+  def test_invocation_order_controller_specific_then_global
+    sequence = []
+
+    Breakfalls.on_error_for('FooController') { |_e, _req, _user, _params| sequence << 'c1' }
+    Breakfalls.on_error_for('FooController') { |_e, _req, _user, _params| sequence << 'c2' }
+    Breakfalls.on_error { |_e, _req, _user, _params| sequence << 'g1' }
+    Breakfalls.on_error { |_e, _req, _user, _params| sequence << 'g2' }
+
+    Breakfalls.run_error_handlers(StandardError.new('oops'), controller: 'FooController')
+
+    assert_equal %w[c1 c2 g1 g2], sequence,
+                 'invocation order should be controller-specific (in order) then global (in order)'
+  end
 end

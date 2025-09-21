@@ -233,6 +233,21 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     assert called1 && called2, 'all controller-specific handlers should be called for DummyController'
   end
 
+  def test_invocation_order_controller_specific_then_global_for_dummy
+    sequence = []
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| sequence << 'c1' }
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| sequence << 'c2' }
+    Breakfalls.on_error { |_e, _req, _user, _params| sequence << 'g1' }
+    Breakfalls.on_error { |_e, _req, _user, _params| sequence << 'g2' }
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal %w[c1 c2 g1 g2], sequence,
+                 'invocation order should be controller-specific (in order) then global (in order)'
+  end
+
   def test_global_only_called_when_no_controller_specific
     called_global = false
     Breakfalls.on_error { |_e, _req, _user, _params| called_global = true }

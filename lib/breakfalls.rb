@@ -28,6 +28,7 @@ module Breakfalls
     # Register a controller-specific error handler.
     # The controller argument should be a class name (String or Symbol).
     # Invocation order at runtime is: controller-specific handlers first, then global handlers.
+    # Within a controller, handlers run in the order they were registered.
     # Example:
     #   Breakfalls.on_error_for('UsersController') do |exception, request, user, params|
     #     Rails.logger.warn("[UsersController] #{exception.class} at #{request&.path}")
