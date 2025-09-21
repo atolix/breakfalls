@@ -4,6 +4,10 @@ require 'test_helper'
 require 'breakfalls/railtie'
 
 class DummyController < ActionController::Base
+  def current_user
+    { 'id' => 123, 'name' => 'dummy' }
+  end
+
   def unrescued_standard
     raise StandardError, 'error!'
   end
@@ -19,6 +23,10 @@ class DummyController < ActionController::Base
   def rescued_standard
     raise StandardError, 'boom'
   rescue StandardError
+    head :ok
+  end
+
+  def success
     head :ok
   end
 end
@@ -44,6 +52,7 @@ class DummyRailsApp < Rails::Application
     get '/unrescued_standard' => 'dummy#unrescued_standard'
     get '/rescued_custom' => 'dummy#rescued_custom'
     get '/rescued_standard' => 'dummy#rescued_standard'
+    get '/success' => 'dummy#success'
     get '/another_unrescued_standard' => 'another#unrescued_standard'
     get '/unregistered_unrescued_standard' => 'unregistered#unrescued_standard'
   end
@@ -55,6 +64,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     Rails.application.config.breakfalls.controllers = %w[DummyController AnotherController]
     Rails.application.initialize! unless Rails.application.initialized?
     Rails.application.reloader.prepare!
+    Breakfalls.error_handlers.clear
   end
 
   def test_handler_called_on_unrescued_standard_error
@@ -97,6 +107,18 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     assert_equal '/unrescued_standard', captured_path, 'request should be passed to the handler'
   end
 
+  def test_handler_receives_current_user
+    captured_user = nil
+    Breakfalls.on_error { |_e, _request, user, _params| captured_user = user }
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal({ 'id' => 123, 'name' => 'dummy' }, captured_user,
+                 'current_user should be passed to the handler when available')
+  end
+
   def test_handler_receives_params
     captured_params = nil
 
@@ -109,6 +131,15 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     # skip exception from unrescued action
   ensure
     assert_equal 'bar', captured_params['foo'], 'params should be passed to the handler'
+  end
+
+  def test_handler_not_called_on_success
+    called = false
+    Breakfalls.on_error { |_e, _request, _user, _params| called = true }
+
+    get '/success'
+
+    assert !called, 'Breakfalls handler should not be called on successful responses'
   end
 
   def test_handler_skips_when_custom_exception_is_rescued
