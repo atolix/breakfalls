@@ -20,9 +20,10 @@ module Breakfalls
               rescue StandardError => e
                 Breakfalls.run_error_handlers(
                   e,
-                  request: request,
+                  request:,
                   user: (respond_to?(:current_user) ? current_user : nil),
-                  params: params
+                  params:,
+                  controller: self.class.name
                 )
                 raise e
               end

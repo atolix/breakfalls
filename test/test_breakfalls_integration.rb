@@ -65,6 +65,7 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
     Rails.application.initialize! unless Rails.application.initialized?
     Rails.application.reloader.prepare!
     Breakfalls.error_handlers.clear
+    Breakfalls.controller_error_handlers.clear if Breakfalls.respond_to?(:controller_error_handlers)
   end
 
   def test_handler_called_on_unrescued_standard_error
@@ -181,5 +182,80 @@ class BreakfallsIntegrationTest < ActionDispatch::IntegrationTest
   ensure
     assert !called,
            'Breakfalls handler should not be called for controllers not registered in config.breakfalls.controllers'
+  end
+
+  def test_controller_specific_handler_called_for_matching_controller
+    called = false
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| called = true }
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert called, 'controller-specific handler should be called for DummyController'
+  end
+
+  def test_controller_specific_handler_not_called_for_other_controller
+    called = false
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| called = true }
+
+    get '/another_unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert !called, 'controller-specific handler for DummyController should not be called for AnotherController'
+  end
+
+  def test_controller_specific_and_global_handlers_both_called
+    called_specific = false
+    called_global = false
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| called_specific = true }
+    Breakfalls.on_error { |_e, _req, _user, _params| called_global = true }
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert called_specific, 'controller-specific handler should be called for DummyController'
+    assert called_global, 'global handler should also be called'
+  end
+
+  def test_multiple_controller_specific_handlers_are_all_called_for_dummy
+    called1 = false
+    called2 = false
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| called1 = true }
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| called2 = true }
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert called1 && called2, 'all controller-specific handlers should be called for DummyController'
+  end
+
+  def test_invocation_order_controller_specific_then_global_for_dummy
+    sequence = []
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| sequence << 'c1' }
+    Breakfalls.on_error_for('DummyController') { |_e, _req, _user, _params| sequence << 'c2' }
+    Breakfalls.on_error { |_e, _req, _user, _params| sequence << 'g1' }
+    Breakfalls.on_error { |_e, _req, _user, _params| sequence << 'g2' }
+
+    get '/unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert_equal %w[c1 c2 g1 g2], sequence,
+                 'invocation order should be controller-specific (in order) then global (in order)'
+  end
+
+  def test_global_only_called_when_no_controller_specific
+    called_global = false
+    Breakfalls.on_error { |_e, _req, _user, _params| called_global = true }
+
+    get '/another_unrescued_standard'
+  rescue StandardError
+    # skip exception from unrescued action
+  ensure
+    assert called_global, 'global handler should be called when controller-specific handler does not exist'
   end
 end

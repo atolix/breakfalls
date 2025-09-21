@@ -5,6 +5,7 @@ require 'test_helper'
 class TestBreakfalls < Minitest::Test
   def setup
     Breakfalls.error_handlers.clear
+    Breakfalls.controller_error_handlers.clear if Breakfalls.respond_to?(:controller_error_handlers)
   end
 
   def test_that_it_has_a_version_number
@@ -43,7 +44,7 @@ class TestBreakfalls < Minitest::Test
 
   def test_handler_receives_request
     captured = nil
-    Breakfalls.on_error { |_e, req, _user, _params| captured = req }
+    Breakfalls.on_error { |_e, request, _user, _params| captured = request }
 
     Breakfalls.run_error_handlers(StandardError.new('oops'), request: { path: '/foo' })
 
@@ -69,7 +70,6 @@ class TestBreakfalls < Minitest::Test
   end
 
   def test_no_handlers_registered_is_safe
-    # should not raise and should return the handlers array (empty)
     result = Breakfalls.run_error_handlers(StandardError.new('no handlers'))
     assert_kind_of Array, result
     assert_empty result
